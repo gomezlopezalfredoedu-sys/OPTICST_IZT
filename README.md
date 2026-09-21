@@ -4,7 +4,7 @@ Base funcional: V23 de Boutique de Lentes Yael.
 
 ## Backend
 Google Sheets:
-1F0EkD-aGSWKxQXUZBrq-KDjHiMNtkoMsnAOWAQmIv_4
+1lpSxsrZp8w2QvtiU9pIQM5wyVKVznYw-ptyGsHZkhBOhRtcGhujip1j8
 
 1. Crea/despliega este `Code.gs` en Apps Script.
 2. Despliega como **Web app**.
