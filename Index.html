@@ -40,6 +40,8 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(144,118,218,.18),0 5
 .pantalla{width:100%}
 .dato-resumen{padding:9px 0;border-bottom:1px solid #ECECF1}
 .boton-ticket{background:#17151E;color:#fff}
+.boton-compartir{background:linear-gradient(135deg,#25D366,#128C7E);color:#fff}
+.boton-compartir:active{filter:brightness(.96)}
 .boton-pdf,.boton-seleccionar{background:linear-gradient(135deg,var(--l),var(--l2));color:#fff}
 .grupo-ticket{margin-top:10px}
 .resultado-seleccionado{background:linear-gradient(135deg,#EEFDFF,#F8F5FF);border:1px solid var(--t);border-radius:13px;padding:14px;margin-top:10px}
@@ -1905,6 +1907,15 @@ function mostrarExito(idVenta, venta) {
   };
   grupo.appendChild(ticketBtn);
 
+  const compartirBtn = document.createElement('button');
+  compartirBtn.type = 'button';
+  compartirBtn.className = 'boton-compartir';
+  compartirBtn.textContent = 'ENVIAR POR WHATSAPP';
+  compartirBtn.onclick = function() {
+    compartirTicketWhatsApp(idVenta, venta);
+  };
+  grupo.appendChild(compartirBtn);
+
   const imagenBtn = document.createElement('button');
   imagenBtn.type = 'button';
   imagenBtn.className = 'boton-imagen';
@@ -2534,6 +2545,112 @@ function ticketSvg_(venta, cliente) {
   );
 }
 
+/* =========================
+   COMPARTIR TICKET POR ANDROID / WHATSAPP
+========================= */
+function textoCompartirTicket_(venta, cliente) {
+  const nombre =
+    (venta && venta.Nombre_Cliente) ||
+    (cliente && cliente.Nombre) ||
+    (cliente && cliente.nombre) ||
+    'cliente';
+
+  return 'Hola ' + String(nombre).trim() +
+    ', te compartimos tu ticket de Boutique de Lentes Yael.';
+}
+
+function compartirTicketWhatsApp(idVenta, ventaPreferida) {
+  if (!idVenta) return;
+
+  datosTicket_(idVenta, function(venta, cliente) {
+    const texto = textoCompartirTicket_(venta, cliente);
+    const svg = ticketSvg_(venta, cliente);
+    const blobSvg = new Blob(
+      [svg],
+      { type: 'image/svg+xml;charset=utf-8' }
+    );
+    const url = URL.createObjectURL(blobSvg);
+    const imagen = new Image();
+
+    imagen.onload = function() {
+      const escala = 2;
+      const canvas = document.createElement('canvas');
+      canvas.width = imagen.width * escala;
+      canvas.height = imagen.height * escala;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        URL.revokeObjectURL(url);
+        alert('No fue posible preparar la imagen del ticket.');
+        return;
+      }
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(imagen, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+
+      canvas.toBlob(function(pngBlob) {
+        if (!pngBlob) {
+          alert('No fue posible preparar la imagen del ticket.');
+          return;
+        }
+
+        const archivo = new File(
+          [pngBlob],
+          'Ticket-' + String(venta.ID_Venta || idVenta) + '.png',
+          { type: 'image/png' }
+        );
+
+        const datosCompartir = {
+          title: 'Ticket de Boutique de Lentes Yael',
+          text: texto,
+          files: [archivo]
+        };
+
+        // Comparte la MISMA imagen que genera "GENERAR IMAGEN",
+        // junto con el mensaje personalizado.
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [archivo] })) {
+          navigator.share(datosCompartir).catch(function(error) {
+            if (error && error.name === 'AbortError') return;
+            alert('No fue posible abrir el menú de compartir.');
+          });
+          return;
+        }
+
+        // Respaldo para navegadores que permiten compartir, pero no archivos.
+        if (navigator.share) {
+          navigator.share({
+            title: datosCompartir.title,
+            text: texto
+          }).catch(function(error) {
+            if (error && error.name === 'AbortError') return;
+            alert('Este navegador no permite compartir la imagen del ticket.');
+          });
+          return;
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(texto).then(function() {
+            alert('El texto fue copiado. Este navegador no permite compartir la imagen directamente.');
+          }).catch(function() {
+            window.prompt('Copia este mensaje:', texto);
+          });
+        } else {
+          window.prompt('Copia este mensaje:', texto);
+        }
+      }, 'image/png');
+    };
+
+    imagen.onerror = function() {
+      URL.revokeObjectURL(url);
+      alert('No fue posible generar la imagen del ticket.');
+    };
+
+    imagen.src = url;
+  }, ventaPreferida);
+}
+
 /* Abre el ticket ya construido. */
 function verTicket(idVenta, ventaPreferida) {
 
@@ -3132,6 +3249,7 @@ function buscarClientesModulo() {
 function mostrarDetalleVentaModulo(venta) {
   const contenedor = document.getElementById('resultadoVentaModulo');
   if (!contenedor || !venta) return;
+  window.ventaDetalleActual = venta;
   const clienteNombre = venta.Nombre_Cliente || 'Cliente no encontrado';
   let conceptos = '';
   if (venta.Armazon_Descripcion) conceptos += '<div><strong>Armazón:</strong> ' + escaparTextoUI(venta.Armazon_Descripcion) + ' — $' + Number(venta.Precio_Armazon || 0).toFixed(2) + '</div>';
@@ -3153,6 +3271,7 @@ function mostrarDetalleVentaModulo(venta) {
       '<div class="v20-meta" style="margin-top:10px"><strong>Estado:</strong> ' + escaparTextoUI(venta.Estado || '') + '</div>' +
       '<div class="v20-actions">' +
         '<button type="button" class="boton-ticket" onclick="verTicket(\'' + venta.ID_Venta + '\')">VER TICKET 58 MM</button>' +
+        '<button type="button" class="boton-compartir" onclick="compartirTicketWhatsApp(\'' + venta.ID_Venta + '\', window.ventaDetalleActual)">ENVIAR POR WHATSAPP</button>' +
         '<button type="button" class="boton-imagen" onclick="generarImagenTicket(\'' + venta.ID_Venta + '\')">GENERAR IMAGEN</button>' +
         '<button type="button" class="boton-pdf" onclick="generarPdfTicket(\'' + venta.ID_Venta + '\')">IMPRIMIR / GUARDAR PDF</button>' +
         (Number(venta.Saldo || 0) > 0 ? '<button type="button" class="boton-seleccionar" onclick="abrirAbonoDesdeVenta(\'' + venta.ID_Venta + '\')">REGISTRAR ABONO</button>' : '') +
