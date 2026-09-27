@@ -4,10 +4,6 @@
   <base target="_top">
 
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="manifest" href="./manifest.json">
-  <meta name="theme-color" content="#9076DA">
-  <link rel="apple-touch-icon" href="./icon-192.png">
-
 
   <style>
 :root{--t:#40C5D2;--t2:#27B2BF;--l:#9076DA;--l2:#755CC8;--ink:#20212A;--muted:#70727D;--bg:#F6F8FB;--card:#FFFFFF;--line:#E7E8EE;--shadow:0 8px 24px rgba(36,32,61,.08);--radius:18px}
@@ -40,9 +36,8 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(144,118,218,.18),0 5
 .pantalla{width:100%}
 .dato-resumen{padding:9px 0;border-bottom:1px solid #ECECF1}
 .boton-ticket{background:#17151E;color:#fff}
-.boton-compartir{background:linear-gradient(135deg,#25D366,#128C7E);color:#fff}
-.boton-compartir:active{filter:brightness(.96)}
 .boton-pdf,.boton-seleccionar{background:linear-gradient(135deg,var(--l),var(--l2));color:#fff}
+.boton-whatsapp{background:#25D366;color:#fff}
 .grupo-ticket{margin-top:10px}
 .resultado-seleccionado{background:linear-gradient(135deg,#EEFDFF,#F8F5FF);border:1px solid var(--t);border-radius:13px;padding:14px;margin-top:10px}
 .detalle-venta{margin-top:10px;padding-top:10px;border-top:1px dashed #B9BAC2;line-height:1.45}
@@ -1325,47 +1320,8 @@ input,select{min-height:53px!important}
   </section>
 
 </div>
-<script src="./config.js"></script>
-<script>
-(function(){
-  'use strict';
-  const API_TYPE='OPTICST_API_RESPONSE';
-  const pending=new Map();
-  let seq=0;
-  function rid(){ seq++; return 'opticst_'+Date.now().toString(36)+'_'+seq.toString(36); }
-  window.addEventListener('message',function(event){
-    let msg=event && event.data;
-    if(typeof msg==='string'){ try{ msg=JSON.parse(msg); }catch(e){ return; } }
-    if(!msg || (msg.type!==API_TYPE && msg.opticst_api!==true)) return;
-    const id=msg.id || msg.rid; if(!id) return;
-    const job=pending.get(id); if(!job) return;
-    pending.delete(id);
-    if(job.timeout) clearTimeout(job.timeout);
-    if(job.iframe && job.iframe.parentNode) job.iframe.parentNode.removeChild(job.iframe);
-    if(job.form && job.form.parentNode) job.form.parentNode.removeChild(job.form);
-    if(msg.ok){ if(typeof job.success==='function') job.success(msg.data); }
-    else { const err=new Error(msg.error || 'Error de comunicación con el sistema.'); if(typeof job.failure==='function') job.failure(err); else console.error(err); }
-  });
-  function callApi(fn,args,success,failure){
-    if(!window.OPTICST_API_URL){ const err=new Error('OPTICST no tiene configurado el backend.'); if(typeof failure==='function') failure(err); return; }
-    const id=rid();
-    const iframe=document.createElement('iframe'); iframe.name=id; iframe.title='OPTICST API'; iframe.style.cssText='position:fixed;width:1px;height:1px;left:-10000px;top:-10000px;border:0;opacity:0;pointer-events:none;'; document.body.appendChild(iframe);
-    const form=document.createElement('form'); form.method='POST'; form.action=window.OPTICST_API_URL; form.target=id; form.style.display='none';
-    function add(name,value){ const input=document.createElement('input'); input.type='hidden'; input.name=name; input.value=value; form.appendChild(input); }
-    add('opticst_api','1'); add('rid',id); add('fn',fn); add('args',JSON.stringify(args||[])); document.body.appendChild(form);
-    const timeout=setTimeout(function(){ if(pending.has(id)){ pending.delete(id); if(iframe.parentNode) iframe.parentNode.removeChild(iframe); if(form.parentNode) form.parentNode.removeChild(form); if(typeof failure==='function') failure(new Error('Tiempo de espera agotado al conectar con Apps Script.')); } },20000);
-    pending.set(id,{success,failure,iframe,form,timeout}); form.submit();
-  }
-  function runner(state){ state=state||{}; return new Proxy({}, {get:function(_t,prop){
-    if(prop==='withSuccessHandler') return function(fn){return runner({success:fn,failure:state.failure});};
-    if(prop==='withFailureHandler') return function(fn){return runner({success:state.success,failure:fn});};
-    if(prop==='withUserObject') return function(){return runner(state);};
-    if(typeof prop!=='string') return undefined;
-    return function(){ callApi(prop,Array.prototype.slice.call(arguments),state.success,state.failure); };
-  }}); }
-  window.google=window.google||{}; window.google.script=window.google.script||{}; window.google.script.run=runner();
-})();
-</script>
+
+
 <script>
 
 let clienteActual = null;
@@ -1907,15 +1863,6 @@ function mostrarExito(idVenta, venta) {
   };
   grupo.appendChild(ticketBtn);
 
-  const compartirBtn = document.createElement('button');
-  compartirBtn.type = 'button';
-  compartirBtn.className = 'boton-compartir';
-  compartirBtn.textContent = 'ENVIAR POR WHATSAPP';
-  compartirBtn.onclick = function() {
-    compartirTicketWhatsApp(idVenta, venta);
-  };
-  grupo.appendChild(compartirBtn);
-
   const imagenBtn = document.createElement('button');
   imagenBtn.type = 'button';
   imagenBtn.className = 'boton-imagen';
@@ -1924,6 +1871,15 @@ function mostrarExito(idVenta, venta) {
     generarImagenTicket(idVenta, venta);
   };
   grupo.appendChild(imagenBtn);
+
+  const whatsappBtn = document.createElement('button');
+  whatsappBtn.type = 'button';
+  whatsappBtn.className = 'boton-whatsapp';
+  whatsappBtn.textContent = 'ENVIAR POR WHATSAPP';
+  whatsappBtn.onclick = function() {
+    compartirWhatsAppTicket(idVenta, venta);
+  };
+  grupo.appendChild(whatsappBtn);
 
   const pdfBtn = document.createElement('button');
   pdfBtn.type = 'button';
@@ -2294,9 +2250,9 @@ function htmlTicket_(venta, cliente) {
   <div class="empresa">Boutique de Lentes Yael</div>
 
   <div class="direccion">
-    Calle 4, 342. Agricola Pántitlan<br>
-    Iztacalco, CDMX 08100<br>
-    Tel. 5611586976
+    Calle 15, 61. El Sol<br>
+    Nezahualcóyotl, Estado de México 57200<br>
+    Tel. 5567513976
   </div>
 
   <div class="line"></div>
@@ -2461,9 +2417,9 @@ function ticketSvg_(venta, cliente) {
   y += 190;
 
   centro('Boutique de Lentes Yael', 17, '700', 22);
-  centro('Calle 4, 342. Agricola Pántitlan', 11, '400', 15);
-  centro('Iztacalco, CDMX 08100', 11, '400', 15);
-  centro('Tel. 5611586976', 11, '400', 16);
+  centro('Calle 15, 61. El Sol', 11, '400', 15);
+  centro('Nezahualcóyotl, Estado de México 57200', 11, '400', 15);
+  centro('Tel. 5567513976', 11, '400', 16);
 
   linea();
 
@@ -2545,112 +2501,6 @@ function ticketSvg_(venta, cliente) {
   );
 }
 
-/* =========================
-   COMPARTIR TICKET POR ANDROID / WHATSAPP
-========================= */
-function textoCompartirTicket_(venta, cliente) {
-  const nombre =
-    (venta && venta.Nombre_Cliente) ||
-    (cliente && cliente.Nombre) ||
-    (cliente && cliente.nombre) ||
-    'cliente';
-
-  return 'Hola ' + String(nombre).trim() +
-    ', te compartimos tu ticket de Boutique de Lentes Yael.';
-}
-
-function compartirTicketWhatsApp(idVenta, ventaPreferida) {
-  if (!idVenta) return;
-
-  datosTicket_(idVenta, function(venta, cliente) {
-    const texto = textoCompartirTicket_(venta, cliente);
-    const svg = ticketSvg_(venta, cliente);
-    const blobSvg = new Blob(
-      [svg],
-      { type: 'image/svg+xml;charset=utf-8' }
-    );
-    const url = URL.createObjectURL(blobSvg);
-    const imagen = new Image();
-
-    imagen.onload = function() {
-      const escala = 2;
-      const canvas = document.createElement('canvas');
-      canvas.width = imagen.width * escala;
-      canvas.height = imagen.height * escala;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        URL.revokeObjectURL(url);
-        alert('No fue posible preparar la imagen del ticket.');
-        return;
-      }
-
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(imagen, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-
-      canvas.toBlob(function(pngBlob) {
-        if (!pngBlob) {
-          alert('No fue posible preparar la imagen del ticket.');
-          return;
-        }
-
-        const archivo = new File(
-          [pngBlob],
-          'Ticket-' + String(venta.ID_Venta || idVenta) + '.png',
-          { type: 'image/png' }
-        );
-
-        const datosCompartir = {
-          title: 'Ticket de Boutique de Lentes Yael',
-          text: texto,
-          files: [archivo]
-        };
-
-        // Comparte la MISMA imagen que genera "GENERAR IMAGEN",
-        // junto con el mensaje personalizado.
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [archivo] })) {
-          navigator.share(datosCompartir).catch(function(error) {
-            if (error && error.name === 'AbortError') return;
-            alert('No fue posible abrir el menú de compartir.');
-          });
-          return;
-        }
-
-        // Respaldo para navegadores que permiten compartir, pero no archivos.
-        if (navigator.share) {
-          navigator.share({
-            title: datosCompartir.title,
-            text: texto
-          }).catch(function(error) {
-            if (error && error.name === 'AbortError') return;
-            alert('Este navegador no permite compartir la imagen del ticket.');
-          });
-          return;
-        }
-
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(texto).then(function() {
-            alert('El texto fue copiado. Este navegador no permite compartir la imagen directamente.');
-          }).catch(function() {
-            window.prompt('Copia este mensaje:', texto);
-          });
-        } else {
-          window.prompt('Copia este mensaje:', texto);
-        }
-      }, 'image/png');
-    };
-
-    imagen.onerror = function() {
-      URL.revokeObjectURL(url);
-      alert('No fue posible generar la imagen del ticket.');
-    };
-
-    imagen.src = url;
-  }, ventaPreferida);
-}
-
 /* Abre el ticket ya construido. */
 function verTicket(idVenta, ventaPreferida) {
 
@@ -2710,6 +2560,58 @@ function generarPdfTicket(idVenta, ventaPreferida) {
       ventana.focus();
       ventana.print();
     }, 500);
+  }, ventaPreferida);
+}
+
+/* Compartir por el menú nativo de Android: imagen PNG del ticket + mensaje personalizado. */
+async function compartirWhatsAppTicket(idVenta, ventaPreferida) {
+  if (!idVenta) return;
+  if (!navigator.share || !navigator.canShare) {
+    alert('Este navegador no permite compartir la imagen del ticket. Usa Chrome en Android.');
+    return;
+  }
+  const boton = document.activeElement;
+  const textoOriginal = boton && boton.tagName === 'BUTTON' ? boton.textContent : '';
+  if (boton && boton.tagName === 'BUTTON') { boton.disabled = true; boton.textContent = 'PREPARANDO TICKET...'; }
+  datosTicket_(idVenta, function(venta, cliente) {
+    const svg = ticketSvg_(venta, cliente);
+    const url = URL.createObjectURL(new Blob([svg], {type:'image/svg+xml;charset=utf-8'}));
+    const imagen = new Image();
+    imagen.onload = async function() {
+      try {
+        const escala = 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = imagen.width * escala;
+        canvas.height = imagen.height * escala;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('No se pudo crear la imagen.');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.drawImage(imagen,0,0,canvas.width,canvas.height);
+        const pngBlob = await new Promise(function(resolve,reject){
+          canvas.toBlob(function(blob){ blob ? resolve(blob) : reject(new Error('No se pudo crear el PNG.')); }, 'image/png', 1);
+        });
+        const nombre = String((venta && venta.Nombre_Cliente) || (cliente && (cliente.Nombre || cliente.nombre)) || 'Cliente').trim();
+        const archivo = new File([pngBlob], 'Ticket_' + String(idVenta).replace(/[^a-zA-Z0-9_-]/g,'_') + '.png', {type:'image/png'});
+        if (!navigator.canShare({files:[archivo]})) throw new Error('Este navegador no permite compartir imágenes. Usa Chrome en Android.');
+        await navigator.share({
+          title:'Ticket Boutique de Lentes Yael',
+          text:'Hola ' + nombre + ', te compartimos tu ticket de Boutique de Lentes Yael.',
+          files:[archivo]
+        });
+      } catch(error) {
+        if (!error || error.name !== 'AbortError') alert(error && error.message ? error.message : 'No fue posible compartir el ticket.');
+      } finally {
+        URL.revokeObjectURL(url);
+        if (boton && boton.tagName === 'BUTTON') { boton.disabled=false; boton.textContent=textoOriginal || 'ENVIAR POR WHATSAPP'; }
+      }
+    };
+    imagen.onerror = function(){
+      URL.revokeObjectURL(url);
+      if (boton && boton.tagName === 'BUTTON') { boton.disabled=false; boton.textContent=textoOriginal || 'ENVIAR POR WHATSAPP'; }
+      alert('No fue posible generar la imagen del ticket.');
+    };
+    imagen.src = url;
   }, ventaPreferida);
 }
 
@@ -3249,7 +3151,6 @@ function buscarClientesModulo() {
 function mostrarDetalleVentaModulo(venta) {
   const contenedor = document.getElementById('resultadoVentaModulo');
   if (!contenedor || !venta) return;
-  window.ventaDetalleActual = venta;
   const clienteNombre = venta.Nombre_Cliente || 'Cliente no encontrado';
   let conceptos = '';
   if (venta.Armazon_Descripcion) conceptos += '<div><strong>Armazón:</strong> ' + escaparTextoUI(venta.Armazon_Descripcion) + ' — $' + Number(venta.Precio_Armazon || 0).toFixed(2) + '</div>';
@@ -3271,8 +3172,8 @@ function mostrarDetalleVentaModulo(venta) {
       '<div class="v20-meta" style="margin-top:10px"><strong>Estado:</strong> ' + escaparTextoUI(venta.Estado || '') + '</div>' +
       '<div class="v20-actions">' +
         '<button type="button" class="boton-ticket" onclick="verTicket(\'' + venta.ID_Venta + '\')">VER TICKET 58 MM</button>' +
-        '<button type="button" class="boton-compartir" onclick="compartirTicketWhatsApp(\'' + venta.ID_Venta + '\', window.ventaDetalleActual)">ENVIAR POR WHATSAPP</button>' +
         '<button type="button" class="boton-imagen" onclick="generarImagenTicket(\'' + venta.ID_Venta + '\')">GENERAR IMAGEN</button>' +
+        '<button type="button" class="boton-whatsapp" onclick="compartirWhatsAppTicket(\'" + venta.ID_Venta + "\')">ENVIAR POR WHATSAPP</button>' +
         '<button type="button" class="boton-pdf" onclick="generarPdfTicket(\'' + venta.ID_Venta + '\')">IMPRIMIR / GUARDAR PDF</button>' +
         (Number(venta.Saldo || 0) > 0 ? '<button type="button" class="boton-seleccionar" onclick="abrirAbonoDesdeVenta(\'' + venta.ID_Venta + '\')">REGISTRAR ABONO</button>' : '') +
       '</div>' +
@@ -3519,9 +3420,5 @@ function actualizarEstadoRebisel(){
 actualizarEstadoRebisel();
 </script>
 
-
-<script>
-if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('./sw.js').catch(function(err){ console.warn('OPTICST SW:',err); }); }); }
-</script>
 </body>
 </html>
